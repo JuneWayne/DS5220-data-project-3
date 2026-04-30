@@ -1,0 +1,4 @@
+venv
+ingestion/package/
+ingestion/deployment_package.zip
+job-market-api/__pycache__/
