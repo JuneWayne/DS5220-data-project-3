@@ -4,7 +4,13 @@
   "stages": {
     "dev": {
       "api_gateway_stage": "api",
-      "autogen_policy": false
+      "autogen_policy": false,
+      "lambda_memory_size": 2048,
+      "lambda_timeout": 60,
+      "layers": [
+        "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p310-numpy:17",
+        "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p310-matplotlib:13"
+      ]
     }
   }
 }

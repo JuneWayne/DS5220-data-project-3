@@ -472,112 +472,67 @@ def extract_job_function(text, title):
     return "Other"
 
 
-def classify_company_industry(company_name: str) -> str:
-    """Classify a company into a coarse industry bucket based on its name."""
+def classify_company_industry(company_name: str, description: str = "") -> str:
     name = (company_name or "").lower()
-    # canonical keyword lists
-    tech_giants = [
-        "google", "alphabet", "microsoft", "meta", "facebook", "amazon", "apple",
-        "netflix", "nvidia", "adobe", "salesforce", "oracle", "ibm", "tesla", "cisco",
-        "intel", "amd", "qualcomm", "broadcom", "texas instruments", "micron",
-        "dell", "hp", "hewlett packard", "lenovo", "vmware", "red hat", "sap",
-        "intuit", "autodesk", "synopsys", "cadence", "ansys", "siemens", "ge digital",
-        "sony", "samsung", "tencent", "alibaba", "baidu", "bytedance", "tiktok",
-        "x", "twitter", "spacex", "paypal", "ebay", "booking", "expedia"
-    ]
-    tech_mid = [
-        "snowflake", "databricks", "palantir", "stripe", "block", "square", "twilio", "cloudflare",
-        "shopify", "atlassian", "zendesk", "mongodb", "datadog", "okta", "servicenow",
-        "airbnb", "uber", "lyft", "doordash", "instacart", "grubhub", "snap", "snapchat",
-        "pinterest", "reddit", "discord", "roblox", "unity", "epic games", "riot games",
-        "zoom", "slack", "asana", "notion", "figma", "canva", "airtable", "hubspot",
-        "splunk", "palo alto", "crowdstrike", "fortinet", "zscaler", "cloudflare",
-        "confluent", "elastic", "hashicorp", "gitlab", "github", "bitbucket",
-        "docusign", "dropbox", "box", "workday", "coupa", "veeva", "appian",
-        "twitch", "spotify", "soundcloud", "duolingo", "coursera", "udemy", "chegg",
-        "robinhood", "coinbase", "kraken", "binance", "plaid", "affirm", "klarna",
-        "chime", "nubank", "revolut", "n26", "monzo", "betterment", "wealthfront",
-        "etsy", "poshmark", "mercari", "offerup", "letgo", "zillow", "redfin",
-        "opendoor", "compass", "trulia", "apartments.com", "realtor.com",
-        "peloton", "strava", "noom", "calm", "headspace", "whoop", "oura",
-        "23andme", "ancestry", "color genomics", "tempus", "flatiron health",
-        "grammarly", "monday.com", "clickup", "smartsheet", "amplitude", "mixpanel",
-        "segment", "mparticle", "braze", "iterable", "sendgrid", "mailchimp",
-        "zapier", "make", "integromat", "fivetran", "airbyte", "census", "hightouch",
-        "retool", "bubble", "webflow", "wix", "squarespace", "wordpress vip",
-        "vercel", "netlify", "render", "fly.io", "railway", "heroku", "planetscale"
-    ]
-    tech_startup_hints = ["labs", "ventures", "ai", "analytics", "systems", "technologies", "solutions"]
-
-    investment_banks = [
-        "goldman", "morgan stanley", "jp morgan", "j.p. morgan", "bank of america", "bofa", "barclays",
-        "credit suisse", "ubs", "deutsche bank", "jefferies", "evercore", "piper sandler", "lazard",
-        "centerview", "moelis", "guggenheim", "rbc capital", "nomura", "mizuho", "hsbc", "citigroup",
-        "citi", "bnpp", "bnp paribas", "wells fargo securities", "td securities", "scotiabank",
-        "bmo capital", "stifel", "william blair", "raymond james", "cowen", "greenhill"
-    ]
-    finance = [
-        "jpmorgan", "chase", "capital one", "american express", "visa", "mastercard", "discover",
-        "blackrock", "fidelity", "two sigma", "citadel", "point72", "aig", "state street",
-        "pnc", "ally", "regions bank", "us bank", "charles schwab", "vanguard", "t. rowe price",
-        "bridgewater", "aqr", "renaissance technologies", "de shaw", "jane street", "jump trading",
-        "hrt", "virtu", "tower research", "susquehanna", "optiver", "imc trading",
-        "prudential", "metlife", "allstate", "progressive", "travelers", "hartford"
-    ]
-    consulting = [
-        "mckinsey", "boston consulting", "bcg", "bain", "deloitte", "pwc", "kpmg", "ey",
-        "ernst & young", "accenture", "booz allen", "oliver wyman", "at kearney", "a.t. kearney",
-        "roland berger", "l.e.k.", "lek consulting", "lek", "strategy&", "monitor deloitte", "monitor","cap tech"
-    ]
-    retail = [
-        "walmart", "target", "costco", "home depot", "lowe's", "lowes", "best buy", "kroger",
-        "walgreens", "cvs", "tesco", "aldi", "lidl", "ikea", "macy", "kohls", "nordstrom", "wayfair",
-        "gap", "old navy", "tj maxx", "marshalls", "ross", "burlington", "bed bath", "williams sonoma",
-        "foot locker", "dick's sporting", "rei", "petco", "petsmart", "whole foods", "trader joe"
-    ]
-    healthcare = [
-        "johnson", "pfizer", "merck", "abbvie", "amgen", "novartis", "roche", "eli lilly",
-        "bristol myers", "gsk", "sanofi", "astrazeneca", "unitedhealth", "cigna", "anthem", "elevance",
-        "moderna", "regeneron", "biogen", "vertex", "gilead", "bayer", "boehringer", "takeda",
-        "cardinal health", "mckesson", "amerisource", "quest diagnostics", "labcorp", "davita",
-        "humana", "centene", "molina", "wellcare", "magellan", "optum", "aetna", "kaiser"
-    ]
-    automotive = [
-        "ford", "gm", "general motors", "toyota", "honda", "bmw", "mercedes", "volkswagen", "stellantis",
-        "rivian", "lucid", "nissan", "hyundai", "kia", "mazda", "subaru", "volvo", "porsche", "ferrari",
-        "waymo", "cruise", "argo ai", "aurora", "motional", "zoox", "mobileye", "aptiv", "bosch automotive"
-    ]
-    energy = [
-        "chevron", "exxon", "exxonmobil", "shell", "bp", "total", "conocophillips", "duke energy",
-        "nextera", "dominion", "southern company", "exelon", "pge", "pg&e", "american electric",
-        "sempra", "consolidated edison", "entergy", "xcel", "wec energy", "enbridge", "kinder morgan"
-    ]
+    desc = (description or "").lower()
+    
+    tech_giants = ["google", "alphabet", "microsoft", "meta", "facebook", "amazon", "apple", "netflix", "nvidia", "adobe", "salesforce", "oracle", "ibm", "tesla", "cisco", "intel", "amd", "qualcomm", "broadcom", "texas instruments", "micron", "dell", "hp", "hewlett packard", "lenovo", "vmware", "red hat", "sap", "intuit", "autodesk", "synopsys", "cadence", "ansys", "siemens", "ge digital", "sony", "samsung", "tencent", "alibaba", "baidu", "bytedance", "tiktok", "x", "twitter", "spacex", "paypal", "ebay", "booking", "expedia", "tsmc", "asml", "lg", "panasonic"]
+    
+    tech_mid = ["snowflake", "databricks", "palantir", "stripe", "block", "square", "twilio", "cloudflare", "shopify", "atlassian", "zendesk", "mongodb", "datadog", "okta", "servicenow", "airbnb", "uber", "lyft", "doordash", "instacart", "grubhub", "snap", "snapchat", "pinterest", "reddit", "discord", "roblox", "unity", "epic games", "riot games", "zoom", "slack", "asana", "notion", "figma", "canva", "airtable", "hubspot", "splunk", "palo alto", "crowdstrike", "fortinet", "zscaler", "cloudflare", "confluent", "elastic", "hashicorp", "gitlab", "github", "bitbucket", "docusign", "dropbox", "box", "workday", "coupa", "veeva", "appian", "twitch", "spotify", "soundcloud", "duolingo", "coursera", "udemy", "chegg", "robinhood", "coinbase", "kraken", "binance", "plaid", "affirm", "klarna", "chime", "nubank", "revolut", "n26", "monzo", "betterment", "wealthfront", "etsy", "poshmark", "mercari", "offerup", "letgo", "zillow", "redfin", "opendoor", "compass", "trulia", "apartments.com", "realtor.com", "peloton", "strava", "noom", "calm", "headspace", "whoop", "oura", "23andme", "ancestry", "color genomics", "tempus", "flatiron health", "grammarly", "monday.com", "clickup", "smartsheet", "amplitude", "mixpanel", "segment", "mparticle", "braze", "iterable", "sendgrid", "mailchimp", "zapier", "make", "integromat", "fivetran", "airbyte", "census", "hightouch", "retool", "bubble", "webflow", "wix", "squarespace", "wordpress vip", "vercel", "netlify", "render", "fly.io", "railway", "heroku", "planetscale", "snowflake", "ui path", "uipath", "mulesoft", "snowflake", "confluent", "toast"]
+    
+    tech_startup_hints = ["labs", "ventures", "ai", "analytics", "systems", "technologies", "solutions", "software", "networks", "platform"]
+    
+    investment_banks = ["goldman", "morgan stanley", "jp morgan", "j.p. morgan", "bank of america", "bofa", "barclays", "credit suisse", "ubs", "deutsche bank", "jefferies", "evercore", "piper sandler", "lazard", "centerview", "moelis", "guggenheim", "rbc capital", "nomura", "mizuho", "hsbc", "citigroup", "citi", "bnpp", "bnp paribas", "wells fargo securities", "td securities", "scotiabank", "bmo capital", "stifel", "william blair", "raymond james", "cowen", "greenhill", "macquarie", "societe generale"]
+    
+    finance = ["jpmorgan", "chase", "capital one", "american express", "visa", "mastercard", "discover", "blackrock", "fidelity", "two sigma", "citadel", "point72", "aig", "state street", "pnc", "ally", "regions bank", "us bank", "charles schwab", "vanguard", "t. rowe price", "bridgewater", "aqr", "renaissance technologies", "de shaw", "jane street", "jump trading", "hrt", "virtu", "tower research", "susquehanna", "optiver", "imc trading", "prudential", "metlife", "allstate", "progressive", "travelers", "hartford", "blackstone", "kkr", "apollo", "carlyle", "sequoia", "andreessen horowitz", "geico", "state farm", "millennium"]
+    
+    consulting = ["mckinsey", "boston consulting", "bcg", "bain", "deloitte", "pwc", "kpmg", "ey", "ernst & young", "accenture", "booz allen", "oliver wyman", "at kearney", "a.t. kearney", "roland berger", "l.e.k.", "lek consulting", "lek", "strategy&", "monitor deloitte", "monitor", "cap tech", "capgemini", "cognizant", "infosys", "wipro", "tcs", "tata", "ibm consulting", "slalom", "booz allen hamilton", "oliver wyman"]
+    
+    retail = ["walmart", "target", "costco", "home depot", "lowe's", "lowes", "best buy", "kroger", "walgreens", "cvs", "tesco", "aldi", "lidl", "ikea", "macy", "kohls", "nordstrom", "wayfair", "gap", "old navy", "tj maxx", "marshalls", "ross", "burlington", "bed bath", "williams sonoma", "foot locker", "dick's sporting", "rei", "petco", "petsmart", "whole foods", "trader joe", "nike", "adidas", "lvmh", "zara", "h&m", "under armour", "lululemon"]
+    
+    healthcare = ["johnson", "pfizer", "merck", "abbvie", "amgen", "novartis", "roche", "eli lilly", "bristol myers", "gsk", "sanofi", "astrazeneca", "unitedhealth", "cigna", "anthem", "elevance", "moderna", "regeneron", "biogen", "vertex", "gilead", "bayer", "boehringer", "takeda", "cardinal health", "mckesson", "amerisource", "quest diagnostics", "labcorp", "davita", "humana", "centene", "molina", "wellcare", "magellan", "optum", "aetna", "kaiser", "medtronic", "stryker", "boston scientific", "abbott", "thermo fisher", "danaher", "iqvia"]
+    
+    automotive = ["ford", "gm", "general motors", "toyota", "honda", "bmw", "mercedes", "volkswagen", "stellantis", "rivian", "lucid", "nissan", "hyundai", "kia", "mazda", "subaru", "volvo", "porsche", "ferrari", "waymo", "cruise", "argo ai", "aurora", "motional", "zoox", "mobileye", "aptiv", "bosch", "caterpillar", "deere", "3m", "honeywell", "lockheed", "boeing", "raytheon", "northrop", "general dynamics"]
+    
+    energy = ["chevron", "exxon", "exxonmobil", "shell", "bp", "total", "conocophillips", "duke energy", "nextera", "dominion", "southern company", "exelon", "pge", "pg&e", "american electric", "sempra", "consolidated edison", "entergy", "xcel", "wec energy", "enbridge", "kinder morgan", "schlumberger", "baker hughes", "halliburton"]
+    
+    telecom = ["at&t", "verizon", "t-mobile", "comcast", "charter", "vodafone", "orange", "bt", "telefonica", "century link", "lumen"]
+    
+    media = ["disney", "warner bros", "paramount", "comcast", "nbcuniversal", "sony pictures", "netflix", "spotify", "live nation", "electronic arts", "take-two", "activision", "fox", "viacom", "hulu"]
+    
+    logistics = ["ups", "fedex", "dhl", "maersk", "xpo", "ch robinson", "uber freight", "delta", "united airlines", "american airlines", "southwest", "ryder", "expeditors"]
 
     def contains(keywords):
         return any(k in name for k in keywords)
 
-    if contains(tech_giants):
-        return "Tech - Giant"
-    if contains(tech_mid):
-        return "Tech - Mid"
-    if contains(investment_banks):
-        return "Investment Banking"
-    if contains(consulting):
-        return "Consulting"
-    if contains(finance):
-        return "Finance"
-    if contains(retail):
-        return "Retail"
-    if contains(healthcare):
-        return "Healthcare / Pharma"
-    if contains(automotive):
-        return "Automotive / Manufacturing"
-    if contains(energy):
-        return "Energy / Utilities"
-    # Startup-ish heuristics (only if nothing else matched)
-    if name and contains(tech_startup_hints):
-        return "Tech - Startup"
-    return "Other"
+    # Check company name for exact matches
+    if contains(tech_giants): return "Tech - Giant"
+    if contains(tech_mid): return "Tech - Mid"
+    if contains(investment_banks): return "Investment Banking"
+    if contains(consulting): return "Consulting"
+    if contains(finance): return "Finance"
+    if contains(retail): return "Retail"
+    if contains(healthcare): return "Healthcare / Pharma"
+    if contains(automotive): return "Automotive / Manufacturing"
+    if contains(energy): return "Energy / Utilities"
+    if contains(telecom): return "Telecommunications"
+    if contains(media): return "Media / Entertainment"
+    if contains(logistics): return "Logistics / Transportation"
+    if name and contains(tech_startup_hints): return "Tech - Startup"
+
+    # Scan description for industry context
+    if any(k in desc for k in ['health', 'medical', 'clinical', 'pharma', 'therapeutics', 'patient', 'biotech']): return "Healthcare / Pharma"
+    if any(k in desc for k in ['finance', 'bank', 'capital', 'investment', 'quant', 'trading', 'wealth', 'asset management']): return "Finance"
+    if any(k in desc for k in ['consult', 'advis', 'strategy', 'client engagement', 'transformation']): return "Consulting"
+    if any(k in desc for k in ['retail', 'commerce', 'store', 'consumer', 'goods', 'merchandising', 'e-commerce']): return "Retail"
+    if any(k in desc for k in ['defense', 'aerospace', 'military', 'manufacturing', 'industrial']): return "Automotive / Manufacturing"
+    if any(k in desc for k in ['energy', 'oil', 'gas', 'solar', 'power', 'utility']): return "Energy / Utilities"
+    if any(k in desc for k in ['telecom', 'wireless', 'broadband', 'network provider']): return "Telecommunications"
+    if any(k in desc for k in ['media', 'entertainment', 'streaming', 'broadcast', 'content creation']): return "Media / Entertainment"
+    if any(k in desc for k in ['supply chain', 'logistics', 'freight', 'transportation', 'shipping']): return "Logistics / Transportation"
+    if any(k in desc for k in ['software', 'app', 'cloud', 'data platform', 'saas']): return "Tech - Startup" 
+
+    return "Corporate / Enterprise IT"
 
 def parse_time_posted(time_posted):
     txt = time_posted.strip().lower()
@@ -684,12 +639,12 @@ def parse_job_postings(df_jobs, geocode: bool = False):
     job["skills"] = ", ".join(skill_list) if skill_list else ""
     job["work_mode"] = extract_work_mode(description, location)
     job["job_function"] = extract_job_function(description, title)
-    job["industry"] = classify_company_industry(job.get("company_name"))
+    job["industry"] = classify_company_industry(job.get("company_name"), description)
     job["visa_sponsorship"] = extract_visa_sponsorship(description)
     posting_dt = parse_time_posted(time_posted)
     job["time_posted_parsed"] = posting_dt.isoformat() if posting_dt else None
     
-    # Geocode location if requested
+    # Geocode location
     if geocode and location:
         lat, lon = geocode_location(location)
         job["latitude"] = lat

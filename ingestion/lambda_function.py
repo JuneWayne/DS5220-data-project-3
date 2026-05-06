@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup, Comment
 import pandas as pd
 from collections import Counter
+from decimal import Decimal
 
 # importing custom parser from another script
 from job_parser import parse_job_postings
@@ -160,10 +161,10 @@ def scrape_linkedin(keywords, location, geo_id, f_tpr="r86400", max_results=50):
 
 # aws lambda function entry point
 def lambda_handler(event, context):
-    logger.info("Lambda triggered. Starting job market ingestion.")
+    logger.info("Lambda triggered, Starting job market ingestion.")
     
     try:
-        # Scrape only a maxmimum of 200 jobs so Lambda doesn't time out 
+        # scrape a maximum of 200 jobs to avoid lambda timeout
         df_jobs = scrape_linkedin(
             keywords="Data intern",
             location="United States",
@@ -176,39 +177,57 @@ def lambda_handler(event, context):
             logger.warning("No jobs found this cycle.")
             return {"statusCode": 200, "body": json.dumps("No jobs found.")}
 
-        # using the custom job parser to extract structured info from the raw job description
+        # extract structured info from raw job description using custom parser
         enriched_jobs = df_jobs.apply(parse_job_postings, axis=1, result_type="expand")
         df_final = pd.DataFrame(enriched_jobs)
         
-        # Aggregate metrics for DynamoDB
-        # store the current timestamp for this run so we can track trends over time in DynamoDB
+        industry_breakdown = {}
+        
+        # fallback in case parser misses the industry column
+        if 'industry' not in df_final.columns:
+            df_final['industry'] = 'General Data'
+            
+        # group jobs by industry to calculate stats
+        for industry, group in df_final.groupby('industry'):
+            total = len(group)
+            
+            # extract and split all skills into a flat list
+            all_skills_list = []
+            for skills_str in group['skills'].dropna():
+                all_skills_list.extend([s.strip() for s in str(skills_str).split(',') if s.strip()])
+            
+            # count frequencies of each skill
+            skill_counts = Counter(all_skills_list)
+            
+            # grab the top 5 most requested skills and calculate percentages
+            top_skills = skill_counts.most_common(5)
+            skill_pcts = {skill: Decimal(str(round((count / total) * 100, 2))) for skill, count in top_skills}
+            # count degree requirements
+            degrees = {}
+            if 'degree_requirement' in group.columns:
+                degrees = group['degree_requirement'].value_counts().to_dict()
+                
+            # store calculated stats for this industry
+            industry_breakdown[industry] = {
+                "total_jobs": int(total),
+                "top_skills": skill_pcts,
+                "degrees": degrees
+            }
+
+        # prepare the single summary row containing all grouped data
         current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        
-        # Count number of work modes
-        work_modes = df_final['work_mode'].value_counts().to_dict()
-        remote_count = work_modes.get('Remote', 0)
-        
-        # Count top skills
-        # join all skills strings, split by comma, count occurrences
-        all_skills = ", ".join(df_final['skills'].dropna().tolist())
-        skill_counts = Counter([s.strip() for s in all_skills.split(',') if s.strip()])
-        
-        # Prepare the single summary row
         item = {
-            'metric_id': 'data_intern_market',  # Partition Key 
-            'timestamp': current_time,          # Sort Key
+            'metric_id': 'data_intern_market',
+            'timestamp': current_time,
             'total_sample_size': len(df_final),
-            'remote_count': int(remote_count),
-            'python_count': skill_counts.get('Python', 0),
-            'sql_count': skill_counts.get('SQL', 0),
-            # You can add more columns here if you want!
+            'industry_stats': industry_breakdown
         }
         
-        # save to dynamodb
+        # save payload to dynamodb
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table('DP3_JobTrends') 
-        
         table.put_item(Item=item)
+        
         logger.info(f"Successfully saved aggregated data to DynamoDB: {item}")
         
         return {
