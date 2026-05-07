@@ -1,14 +1,14 @@
-# DS5220 Data Project 3 I Data Science Internship Job Market Trends Tracker
+# DS5220 Data Project 3: Early Careers Data Science Job Market Trends Tracker
 
 I developed this project to track the early career job market for data scientists by utilizing a custom made job board scraper engine. I designed the system to scrape job postings every hour so I can analyze current trends in the internship landscape. 
 
 ## Overview
 
-I built this system to ingest job postings and use a custom Python parser that extracts structured information from unstructured text. My scripts categorize each job into specific industries and extract required technical and soft skills. Furthermore, I determine details such as degree requirements and whether visa sponsorship is available for each role.
+This system is built to ingest job postings and use a custom Python parser that extracts structured information from unstructured text. My scripts categorize each job into specific industries and extract required technical and soft skills. Furthermore, I determine details such as degree requirements and whether visa sponsorship is available for each role through manual parsing of the job description keywords.
 
 ## Architecture
 
-The project relies on AWS serverless infrastructure for all operations. My data ingestion and parsing scripts run on AWS Lambda and I store the cleaned and categorized data in Amazon DynamoDB. Because libraries like Matplotlib and Pandas are often too large for Lambda, I created a custom slim layer to ensure the package fits within the AWS 250MB limit. The backend API is built using the AWS Chalice framework and I use this to manage the routing and deployment for the entire application.
+The project relies on AWS serverless infrastructure for all operations. My data ingestion and parsing scripts run on AWS Lambda and I store the cleaned and categorized data in Amazon DynamoDB. The backend API is built using the AWS Chalice framework and I use this to manage the routing and deployment for the entire application.
 
 ## API Endpoints
 
@@ -26,10 +26,16 @@ I designed the API to be easily consumed by external applications and it is curr
 
 ## How to use the Discord bot
 
-If you want to interact with the data on Discord, you can use the following commands.
+To interact with the data on Discord, you can use the following commands.
 
-To see the current job market snapshot, type /project wkt7ne current. 
+To see the current job market snapshot, type `/project wkt7ne current`. 
 
-If you want to see the weekly trend report and demand surges, type /project wkt7ne trend. 
+To see the weekly trend report and demand surges, type `/project wkt7ne trend`. 
 
-To view the graphical heatmap, type /project wkt7ne plot and the bot will display the image link from S3 so the plot renders directly in the chat.
+To view the graphical heatmap, type `/project wkt7ne plot` and the bot will display the image link from S3.
+
+To see the education requirements, type `/project wkt7ne education`.
+
+To compare two specific industries, type `/project wkt7ne compare [industry_a] [industry_b]`.
+
+To get a list of all identified skills and their frequency, type `/project wkt7ne skills`.
