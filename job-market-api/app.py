@@ -11,8 +11,8 @@ table = dynamodb.Table('DP3_JobTrends')
 @app.route('/')
 def index():
     return {
-        "about": "Tracks the hourly demand and skill requirements for Data Intern roles on LinkedIn.",
-        "resources": ["current", "trend", "plot"]
+        "about": "An API that tracks the demand for specific technical and soft skills in the Early Careers Data Science job market.",
+        "resources": ["current", "trend", "plot", "education", "compare", "skill"]
     }
 
 @app.route('/current')
@@ -49,8 +49,6 @@ def current():
                 global_skill_pct[skill] = round((count / total_market_jobs) * 100, 2)
 
         sorted_skills = dict(sorted(global_skill_pct.items(), key=lambda item: item[1], reverse=True))
-
-        # Build the Human-Readable Markdown String
         date_str = latest.get('timestamp', 'Unknown')[:10]
         msg = f"**Current Market Snapshot** *(Last updated: {date_str})*\n\n"
         msg += f"**Total Postings Analyzed:** {total_market_jobs}\n\n"
@@ -156,94 +154,55 @@ def trend():
         return {"response": f"Error: {str(e)}"}
 @app.route('/plot')
 def plot():
+    return {
+        "response": "https://dp3-plots-wkt7ne.s3.amazonaws.com/heatmap_dynamic_bb675553.png"
+    }
+
+@app.route('/skill/{skill_name}')
+def specific_skill(skill_name):
     try:
         response = table.query(
             KeyConditionExpression=Key('metric_id').eq('data_intern_market'),
-            ScanIndexForward=False, 
-            Limit=1
+            ScanIndexForward=False, Limit=1
         )
-        
         items = response.get('Items', [])
-        if not items or 'industry_stats' not in items[0]:
-            return {"response": "Not enough industry data collected yet."}
+        if not items: return {"response": "No data available."}
 
-        stats = items[0]['industry_stats']
-
-        all_industries = list(stats.keys())
-        industries = []
+        stats = items[0].get('industry_stats', {})
+        total_market_jobs = int(items[0].get('total_sample_size', 0))
         
-        for ind in all_industries:
-            total_jobs = int(stats[ind].get('total_jobs', 0))
-            if total_jobs >= 5:
-                industries.append(ind)
+        skill_total_mentions = 0
+        industry_breakdown = {}
+
+        # Search for the skill across all industries
+        for ind, data in stats.items():
+            jobs_in_ind = int(data.get('total_jobs', 0))
+            for s_name, pct in data.get('top_skills', {}).items():
+                if skill_name.lower().strip() in s_name.lower():
+                    mentions = (float(pct) / 100) * jobs_in_ind
+                    skill_total_mentions += mentions
+                    industry_breakdown[ind] = float(pct)
+
+        if skill_total_mentions == 0:
+            return {"response": f"I couldn't find any significant demand for '{skill_name}' in the current data science job market database"}
+
+        global_pct = round((skill_total_mentions / total_market_jobs) * 100, 2)
+        sorted_inds = sorted(industry_breakdown.items(), key=lambda x: x[1], reverse=True)
+
+        msg = f"**Skill Deep Dive: {skill_name.title()}**\n"
+        msg += f"• **Global Market Demand:** {global_pct}%\n\n"
+        msg += "**Highest Demand Sectors:**\n"
         
-        unique_skills = set()
-        for ind in industries:
-            top_skills = stats[ind].get('top_skills', {})
-            unique_skills.update(top_skills.keys())
-        
-        display_skills = list(unique_skills)
-        
-        if not display_skills:
-            return {"response": "No significant skills extracted yet to plot."}
+        for ind, pct in sorted_inds[:3]: # Show top 3 sectors
+            msg += f"• {ind}: {pct}%\n"
 
-        data_matrix = []
-        for ind in industries:
-            ind_skills = stats[ind].get('top_skills', {})
-            row = [float(ind_skills.get(skill, 0)) for skill in display_skills]
-            data_matrix.append(row)
-
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import io
-        import uuid
-
-        data_array = np.array(data_matrix)
-
-        fig_width = max(10, len(display_skills) * 1.2)
-        fig, ax = plt.subplots(figsize=(fig_width, 8))
-        
-        cax = ax.imshow(data_array, cmap='YlGnBu', aspect='auto')
-
-        cbar = fig.colorbar(cax)
-        cbar.set_label('Demand Percentage (%)', rotation=270, labelpad=15)
-
-        ax.set_xticks(np.arange(len(display_skills)))
-        ax.set_yticks(np.arange(len(industries)))
-        
-        ax.set_xticklabels(display_skills, rotation=45, ha="right")
-        ax.set_yticklabels(industries)
-
-        for i in range(len(industries)):
-            for j in range(len(display_skills)):
-                val = data_array[i, j]
-                text_str = f"{val:.0f}%" if val > 0 else ""
-                text_color = "white" if val > 50 else "black"
-                ax.text(j, i, text_str, ha="center", va="center", color=text_color, fontweight='bold', fontsize=9)
-
-        ax.set_title('Dynamic Skill Demand Heatmap by Industry', pad=20)
-        fig.tight_layout()
-
-        img_buffer = io.BytesIO()
-        plt.savefig(img_buffer, format='png')
-        img_buffer.seek(0)
-        plt.close()
-
-        s3 = boto3.client('s3')
-        bucket_name = 'dp3-plots-wkt7ne' 
-        file_name = f'heatmap_dynamic_{uuid.uuid4().hex[:8]}.png' 
-        
-        s3.put_object(
-            Bucket=bucket_name,
-            Key=file_name,
-            Body=img_buffer,
-            ContentType='image/png'
-        )
-
-        s3_url = f"https://{bucket_name}.s3.amazonaws.com/{file_name}"
-        return {"response": s3_url}
-
+        return {"response": msg.strip()}
     except Exception as e:
-        return {"response": f"Plotting error: {str(e)}"}
+        return {"response": f"Error: {str(e)}"}
+@app.route('/skill')
+def skill_fallback():
+    return {"response": "please specify a skill to search for. Example: `/project wkt7ne skill/python`"}
+
+@app.route('/compare')
+def compare_fallback():
+    return {"response": "please specify two industries to compare. Example: `/project wkt7ne compare/startup/finance`"}
