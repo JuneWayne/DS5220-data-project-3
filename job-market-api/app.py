@@ -155,7 +155,7 @@ def trend():
 @app.route('/plot')
 def plot():
     return {
-        "response": "https://dp3-plots-wkt7ne.s3.amazonaws.com/heatmap_dynamic_bb675553.png"
+        "response": "https://dp3-plots-wkt7ne.s3.amazonaws.com/latest.png"
     }
 
 @app.route('/skill/{skill_name}')
